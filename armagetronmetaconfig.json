@@ -1,0 +1,8 @@
+[
+    {
+        "ConfigFile": "reglages-amp.cfg",
+        "ConfigType": "template",
+        "AutoMap": true,
+        "ConfigFileTemplate": "armagetron/AMP_reglages.cfg"
+    }
+]

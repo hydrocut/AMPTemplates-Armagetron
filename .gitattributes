@@ -1,0 +1,3 @@
+# Le lanceur et le modele sont lus dans le conteneur Linux : toujours en LF.
+*.py text eol=lf
+*.cfg text eol=lf

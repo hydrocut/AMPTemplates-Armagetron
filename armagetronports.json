@@ -1,0 +1,9 @@
+[
+    {
+        "Protocol": "UDP",
+        "Port": 4534,
+        "Ref": "GamePort",
+        "Name": "Port du jeu",
+        "Description": "Seul port a ouvrir, en UDP (le jeu n'utilise pas TCP). 4534 est le port par defaut d'Armagetron Advanced : c'est celui que le jeu propose dans connection perso. Les serveurs maitres apprennent le port tout seuls."
+    }
+]

@@ -1,0 +1,43 @@
+[
+    {
+        "UpdateStageName": "Serveur officiel Armagetron Advanced (AppImage, derniere version stable)",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://download.armagetronad.org/appimage/ArmagetronAdvancedDedicated.AppImage",
+        "UpdateSourceArgs": "ArmagetronAdvancedDedicated.AppImage",
+        "UpdateSourceTarget": "{{$FullBaseDir}}",
+        "UnzipUpdateSource": false,
+        "OverwriteExistingFiles": true,
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Script de lancement (lancer-armagetron.py)",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://raw.githubusercontent.com/hydrocut/AMPTemplates-Armagetron/main/scripts/lancer-armagetron.py",
+        "UpdateSourceArgs": "lancer-armagetron.py",
+        "UpdateSourceTarget": "{{$FullBaseDir}}",
+        "UnzipUpdateSource": false,
+        "OverwriteExistingFiles": true,
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Modele des reglages (AMP_reglages.cfg)",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "FetchURL",
+        "UpdateSourceData": "https://raw.githubusercontent.com/hydrocut/AMPTemplates-Armagetron/main/scripts/AMP_reglages.cfg",
+        "UpdateSourceArgs": "AMP_reglages.cfg",
+        "UpdateSourceTarget": "{{$FullBaseDir}}",
+        "UnzipUpdateSource": false,
+        "OverwriteExistingFiles": true,
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Extraction du serveur et verification",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/usr/bin/python3",
+        "UpdateSourceArgs": "-u \"{{$FullBaseDir}}lancer-armagetron.py\" installer",
+        "SkipOnFailure": false
+    }
+]

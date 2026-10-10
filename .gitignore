@@ -1,0 +1,14 @@
+# Ce depot ne contient que le template : le serveur vient de l'AppImage officielle,
+# telechargee et extraite dans l'instance a chaque Update. Rien de ce qui suit ne doit y entrer.
+armagetron/
+serveur/
+config/
+var/
+donnees/
+perso.cfg
+reglages-amp.cfg
+*.AppImage
+__pycache__/
+
+# Notes internes de TeamKit (essais, etapes), pas dans le depot public
+FAISABILITE.md
