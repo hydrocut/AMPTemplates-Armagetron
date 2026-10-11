@@ -152,6 +152,11 @@ NOUVELLES = {
     'TK_VOTES_JOUEURS': '4',
     'TK_VOTES_ANCIENNETE': '300',
     'TK_VOTES_MODES': 'classique, equipes, forteresse, zone, sumo',
+    # 11/10/2026 (2e lot) : message d'accueil et rappels. Sans effet tant que la rotation
+    # et les votes sont coupes (cas d'un formulaire plus ancien) : rien ne change alors.
+    'TK_ACCUEIL_INFOS': '1',
+    'TK_ACCUEIL_DUREE': '60',
+    'TK_RAPPEL_MINUTES': '10',
 }
 
 
@@ -393,6 +398,7 @@ class Rotation:
         # reglages des bots d'AMP, renvoyes aussi : des cartes mettent NUM_AIS 0, SP_MIN_PLAYERS 0
         self.bots = [tuple(l.split(' ', 1)) for l in bots]
         self.ratees = set()
+        self.a_annoncer = []
         self.compte = 0
         self.vote_mode = None
         self.vote_carte = None
@@ -437,10 +443,67 @@ class Rotation:
     def lignes_initiales(self):
         return ['%s %s' % kv for kv in self.valeurs()] + ['MAP_FILE ' + self.carte[1]]
 
-    def annonce(self):
-        return 'CONSOLE_MESSAGE 0xffff7fCarte : %s  -  mode : %s' % (self.carte[4], MODES[self.mode][0])
+    # Messages aux joueurs : Latin-1 seulement (pas d'emoji, la police du jeu n'en a pas) ;
+    # 0xRRGGBB colore la suite. Reglages poses par preparer() : accueil, infos, votes, rappel_s.
+    accueil = ''
+    infos = False
+    votes_modes = ()
+    votes_cartes = ()
+    rappel_s = 0
+    a_annoncer = ()         # messages a envoyer au debut de la prochaine manche
+    dernier_aide = None     # heure du dernier message qui expliquait les votes
+    INTERVALLE_AIDE = 120   # pas deux fois l'aide aux votes en moins de 2 min
 
-    def fin_de_manche(self):
+    def nom_vote(self):
+        if self.votes_modes and self.votes_cartes:
+            return '<mode ou carte>'
+        return '<mode>' if self.votes_modes else '<carte>'
+
+    def exemple_vote(self):
+        autres = [m for m in self.votes_modes if m != self.mode] or \
+                 [c for c in self.votes_cartes if c != self.carte[0]] or ['carre']
+        return autres[0]
+
+    def motd(self):
+        """Valeur de MESSAGE_OF_DAY : texte d'AMP + mode et carte en cours + comment voter."""
+        lignes = ['0xffcc44Mode : 0xffffff%s0xffcc44   ·   Carte : 0xffffff%s'
+                  % (MODES[self.mode][0], self.carte[4])]
+        if self.votes_modes or self.votes_cartes:
+            lignes += ['',
+                       '0xffcc44Envie d\'un autre mode ou d\'une autre carte ?0xffffff '
+                       'Tape dans le chat (touche Entrée) :',
+                       '0x7fff7f/vote include %s0xffffff   (exemple : 0x7fff7f/vote include %s0xffffff)'
+                       % (self.nom_vote(), self.exemple_vote()),
+                       'Liste des noms : 0x7fff7f/help votes',
+                       '0xffffffPour approuver le vote d\'un autre joueur : Échap > Vote > flèche droite > Échap.']
+        bloc = '\\n'.join(lignes)
+        return (self.accueil + '\\n\\n' + bloc) if self.accueil else bloc
+
+    def annonce(self, maintenant=None):
+        ligne = ('CONSOLE_MESSAGE 0xffcc44» Nouvelle carte : 0xffffff%s0xffcc44  ·  Mode : 0xffffff%s'
+                 % (self.carte[4], MODES[self.mode][0]))
+        if (self.votes_modes or self.votes_cartes) and maintenant is not None and (
+                self.dernier_aide is None or maintenant - self.dernier_aide >= self.INTERVALLE_AIDE):
+            ligne += ('0xaaaaaa  ·  Envie d\'autre chose ? 0x7fff7f/vote include %s0xaaaaaa '
+                      '(liste : /help votes)' % self.nom_vote())
+            self.dernier_aide = maintenant
+        return ligne
+
+    def rappel(self, maintenant, humains):
+        """Rappel discret, s'il y a des humains et si l'aide n'a pas ete donnee depuis rappel_s."""
+        if not self.rappel_s or not humains or not (self.votes_modes or self.votes_cartes):
+            return None
+        if self.dernier_aide is None:
+            self.dernier_aide = maintenant      # premier rappel au bout de rappel_s
+            return None
+        if maintenant - self.dernier_aide < self.rappel_s:
+            return None
+        self.dernier_aide = maintenant
+        return ('CONSOLE_MESSAGE 0xaaaaaa» Rappel : 0x7fff7f/vote include %s0xaaaaaa pour changer '
+                'de mode ou de carte, 0x7fff7f/help votes0xaaaaaa pour la liste, Échap > Vote '
+                'pour approuver.' % self.nom_vote())
+
+    def fin_de_manche(self, maintenant=None, humains=1):
         """Appele sur l'evenement WAIT_FOR_EXTERNAL_SCRIPT : commandes a envoyer."""
         self.compte += 1
         mode, carte = self.mode, self.carte
@@ -470,7 +533,17 @@ class Rotation:
             commandes.append('MAP_FILE ' + carte[1])
             self.precedente = (self.mode, self.carte)
             self.mode, self.carte = mode, carte
-            commandes.append(self.annonce())
+            # annonce envoyee au debut de la manche suivante (NEW_ROUND) : envoyee ici, elle
+            # serait chassee de l'ecran des joueurs par les 6 lignes de fin de manche
+            self.a_annoncer.append(self.annonce(maintenant))
+            if self.infos:
+                # lu a chaque connexion (LoginCallback, gGame.cpp) : les nouveaux venus
+                # voient le mode et la carte du moment
+                commandes.append('MESSAGE_OF_DAY ' + self.motd())
+        elif maintenant is not None:
+            r = self.rappel(maintenant, humains)
+            if r:
+                self.a_annoncer.append(r)
         commandes.append('WAIT_FOR_EXTERNAL_SCRIPT 0')
         return commandes
 
@@ -497,7 +570,8 @@ class Rotation:
                 'rotation jusqu\'au prochain redemarrage.' % rate[1])
 
     def cles(self):
-        return set(BASE) | {c for c, _ in self.bots} | {'MAP_FILE', 'WAIT_FOR_EXTERNAL_SCRIPT'}
+        return set(BASE) | {c for c, _ in self.bots} | {'MAP_FILE', 'WAIT_FOR_EXTERNAL_SCRIPT',
+                                                       'MESSAGE_OF_DAY'}
 
 
 def lire_perso(texte):
@@ -543,6 +617,11 @@ def interpreter(vus, avertir):
         elif m != 'aucun':
             avertir('TK_VOTES_MODES : mode inconnu « %s » ignore (%s).' % (m, ', '.join(MODES)))
     r['votes_modes'] = modes
+    if vus['TK_ACCUEIL_INFOS'].strip() not in ('0', '1'):
+        raise Refus('TK_ACCUEIL_INFOS : 0 ou 1, pas "%s".' % vus['TK_ACCUEIL_INFOS'].strip())
+    r['accueil_infos'] = vus['TK_ACCUEIL_INFOS'].strip() == '1'
+    r['accueil_duree'] = entier('TK_ACCUEIL_DUREE', vus['TK_ACCUEIL_DUREE'].strip(), 5, 600)
+    r['rappel'] = int(entier('TK_RAPPEL_MINUTES', vus['TK_RAPPEL_MINUTES'].strip(), 0, 240))
     return r
 
 
@@ -626,6 +705,15 @@ def preparer(texte_amp, texte_perso, port, joueurs, avertir, hasard=None):
             avertir('perso.cfg : caracteres retires : %s' % ' '.join(retires))
         lignes.append(ligne)
     actif = r['rotation'] != 'aucune' or r['votes'] == 'modes_cartes'
+    modes_v, cartes_v = noms_de_vote(r)
+    rotation.votes_modes, rotation.votes_cartes = modes_v, cartes_v
+    rotation.rappel_s = r['rappel'] * 60
+    lignes.append('MESSAGE_OF_DAY_TIMEOUT ' + r['accueil_duree'])
+    if actif and r['accueil_infos']:
+        rotation.infos = True
+        rotation.accueil = texte_ligne('MESSAGE_OF_DAY', vus['MESSAGE_OF_DAY'], lambda m: None)
+        i = next(k for k, l in enumerate(lignes) if l.startswith('MESSAGE_OF_DAY '))
+        lignes[i] = 'MESSAGE_OF_DAY ' + rotation.motd()
     lignes += [
         '',
         '# --- impose par le template (apres perso.cfg) ---',
@@ -683,12 +771,14 @@ CARTE_RATEE = re.compile(r'could not be loaded or parsed|Reverting to last known
 class Filtre:
     """Transforme chaque ligne du serveur (deja en str) en 0, 1 ou 2 lignes pour AMP."""
 
-    def __init__(self, port, rotation=None):
+    def __init__(self, port, rotation=None, horloge=time.monotonic):
+        self.horloge = horloge
         self.port = port
         self.noms = {}          # nom de journal -> nom affiche
         self.pret = False
         self.rotation = rotation
         self.a_envoyer = []     # commandes pour le serveur, envoyees par la boucle principale
+        self.suite_echo = False
         if rotation:
             cles = '|'.join(sorted(re.escape(c) for c in rotation.cles()))
             # echo des reglages changes entre deux manches : « [0] MAP_FILE a change ... »
@@ -719,16 +809,24 @@ class Filtre:
                 return ['TeamKit : depart de %s' % ancien, 'TeamKit : arrivee de %s' % nom]
             if self.rotation and evt == 'WAIT_FOR_EXTERNAL_SCRIPT':
                 # fin de manche : le serveur attend nos reglages (3 s au plus)
-                self.a_envoyer += self.rotation.fin_de_manche()
+                self.a_envoyer += self.rotation.fin_de_manche(self.horloge(), len(self.noms))
             elif self.rotation and evt == 'NEW_ROUND':
                 self.a_envoyer.append('WAIT_FOR_EXTERNAL_SCRIPT 1')
+                self.a_envoyer += self.rotation.a_annoncer
+                self.rotation.a_annoncer = []
             return []           # le reste du ladderlog reste dans var/ladderlog.txt
         if BRUIT.match(l):
             return []
         sortie = []
         if self.rotation:
             if self.echo.match(l):
+                # l'echo de MESSAGE_OF_DAY s'etale sur plusieurs lignes (ancien et nouveau
+                # texte) : les lignes suivantes sans « [n] » en font partie
+                self.suite_echo = True
                 return []
+            if self.suite_echo and not l.startswith('['):
+                return []
+            self.suite_echo = False
             m = VOTE_INCLUS.match(l)
             if m:
                 message = self.rotation.vote(m.group(1).lower())

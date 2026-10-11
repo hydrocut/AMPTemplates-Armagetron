@@ -281,6 +281,51 @@ did not count and the poll expired).
 Tested with two real clients from two addresses: proposal by one, approval through the menu by the
 other → accepted, mode switched at the next round.
 
+### Telling players about votes (welcome window, map announcement, reminder)
+
+There is no button for votes in the game, so the launcher tells players (Latin-1 only — no emoji
+in the game's font —, with `0xRRGGBB` colours; all tested in the real client):
+
+- **Welcome window.** `MESSAGE_OF_DAY` is shown full screen to every player who connects
+  (`LoginCallback` → `sg_FullscreenMessage` in `gGame.cpp`), with `TITLE_OF_DAY` as title, until a key
+  is pressed or `MESSAGE_OF_DAY_TIMEOUT` seconds (AMP: *Durée maximale du message d'accueil*, 60).
+  The server reads the setting at each login, so the launcher updates it at every map or mode change:
+  newcomers see the current ones (checked by reconnecting after a map change). Below AMP's own text
+  (*Ajouter le mode, la carte et l'aide aux votes*, on by default):
+
+  ```
+  Mode : Équipes   ·   Carte : Inaktek
+
+  Envie d'un autre mode ou d'une autre carte ? Tape dans le chat (touche Entrée) :
+  /vote include <mode ou carte>   (exemple : /vote include classique)
+  Liste des noms : /help votes
+  Pour approuver le vote d'un autre joueur : Échap > Vote > flèche droite > Échap.
+  ```
+
+  Without mode and map votes, only the `Mode : … · Carte : …` line is added. With rotation and
+  votes both off (older forms included), the welcome text is AMP's alone, as before.
+- **Map change**, in the chat (`CONSOLE_MESSAGE`), sent at the **start** of the new round: sent between
+  rounds it was pushed off the player's screen at once by the six end-of-round lines (seen in the test):
+
+  ```
+  » Nouvelle carte : Diamant  ·  Mode : Équipes  ·  Envie d'autre chose ? /vote include <mode ou carte> (liste : /help votes)
+  ```
+
+  The part from *Envie d'autre chose* is added at most once every 2 minutes.
+- **Reminder** (*Rappel des commandes de vote toutes les N minutes*, default 10, 0 = off), at the start
+  of a round, only with humans connected and mode/map votes open, and only if no message gave the vote
+  help during those N minutes (a map announcement with the help counts):
+
+  ```
+  » Rappel : /vote include <mode ou carte> pour changer de mode ou de carte, /help votes pour la liste, Échap > Vote pour approuver.
+  ```
+
+Anti-spam, checked by `verifier.py` over one simulated hour of 10-second rounds with a map change
+each round: 360 short map announcements, the vote help in 30 of them (every 2 min), no reminder; with
+a fixed map, one reminder every 10 minutes and none once the last player has left. In the real test
+(1-minute reminder, 15-second rounds) the reminders came 70 s apart. The server's echo of the changed
+`MESSAGE_OF_DAY` (several lines, old and new text) is removed from AMP's console.
+
 ### Existing instances (Fetch Latest does not update the form)
 
 An instance keeps the settings form it was created with. After Update (new launcher and model), AMP
@@ -396,4 +441,9 @@ obligatoire. Un seul port, **4534 en UDP**.
   `/vote include hexatron` dans le chat, les autres approuvent par Échap → Vote, `/help votes`
   donne la liste. Une instance créée avant garde son ancien formulaire et fonctionne exactement
   comme avant tant que le formulaire n'est pas mis à jour.
+- **Pour que les joueurs sachent qu'ils peuvent voter** : la grande fenêtre d'accueil montre le mode
+  et la carte en cours (mis à jour à chaque changement) et comment voter ; à chaque nouvelle carte,
+  une ligne dans le chat « » Nouvelle carte : X · Mode : Y » (avec l'aide aux votes au plus toutes les
+  2 min) ; un rappel discret toutes les 10 min (réglable, 0 = coupé), seulement s'il y a des joueurs.
+  Pas d'émoji (la police du jeu n'en a pas) : couleurs à la place.
 - Avant de pousser : `python verifier.py` doit répondre « Tout est bon. ».

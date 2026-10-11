@@ -286,7 +286,8 @@ ESSAIS = [
 ]
 n = 0
 for p, v, attendu in ESSAIS:
-    vals = dict(defauts)
+    # sans le bloc mode/carte/votes ajoute au message d'accueil (teste plus bas)
+    vals = dict(defauts, TK_ACCUEIL_INFOS='0')
     vals[p] = v
     avis = []
     try:
@@ -528,11 +529,101 @@ if not f.a_envoyer or f.a_envoyer[-1] != 'WAIT_FOR_EXTERNAL_SCRIPT 0':
     soucis.append('evenement WAIT_FOR_EXTERNAL_SCRIPT sans reponse')
 f.a_envoyer = []
 f.ligne('[L] NEW_ROUND 2026-10-11 09:56:50 UTC')
-if f.a_envoyer != ['WAIT_FOR_EXTERNAL_SCRIPT 1']:
+if not f.a_envoyer or f.a_envoyer[0] != 'WAIT_FOR_EXTERNAL_SCRIPT 1' or len(f.a_envoyer) > 2:
     soucis.append('NEW_ROUND doit remettre WAIT_FOR_EXTERNAL_SCRIPT 1')
 if not f.ligne('[0] The map TeamKit/essai/inexistante-1.0.aamap.xml could not be loaded or parsed; please check your configuration and the log.')[1:]:
     soucis.append('carte illisible non signalee')
 print('ok   cartes, modes, votes       %d cartes, %d modes, ancien formulaire inchange, rotation simulee' % (len(L.CARTES), len(L.MODES)))
+
+# message d'accueil, annonce de nouvelle carte, rappel periodique (2e lot du 11/10/2026)
+contenu, rot, _ = L.preparer(rendre(defauts), '', 4534, 16, lambda m: None, _random.Random(5))
+lu = lire_comme_le_jeu(contenu.encode('latin-1'))
+motd = lu.get('MESSAGE_OF_DAY', '')
+debut = defauts['MESSAGE_OF_DAY'].replace('\\n', '\n')
+for morceau in (debut + '\n\n', 'Mode : 0xffffff' + L.MODES[rot.mode][0], 'Carte : 0xffffff' + rot.carte[4],
+                '/vote include <mode ou carte>', '/help votes', 'Échap > Vote > flèche droite'):
+    if morceau not in motd:
+        soucis.append('message d\'accueil : %r absent' % morceau)
+if lu.get('MESSAGE_OF_DAY_TIMEOUT') != defauts['TK_ACCUEIL_DUREE']:
+    soucis.append('MESSAGE_OF_DAY_TIMEOUT non ecrit')
+if re.search(r'[^\x00-\xff]', motd):
+    soucis.append('message d\'accueil hors Latin-1')
+# votes coupes : on parle du mode et de la carte, pas des votes
+vals = dict(defauts, TK_VOTES='exclusion')
+lu = lire_comme_le_jeu(L.preparer(rendre(vals), '', 4534, 16, lambda m: None)[0].encode('latin-1'))
+if 'vote' in lu['MESSAGE_OF_DAY'].lower() or 'Carte :' not in lu['MESSAGE_OF_DAY']:
+    soucis.append('votes coupes : le message d\'accueil parle encore des votes')
+# case decochee : message d'AMP seul
+vals = dict(defauts, TK_ACCUEIL_INFOS='0')
+lu = lire_comme_le_jeu(L.preparer(rendre(vals), '', 4534, 16, lambda m: None)[0].encode('latin-1'))
+if lu['MESSAGE_OF_DAY'] != debut:
+    soucis.append('case decochee : message d\'accueil modifie')
+
+# anti-spam : manches de 10 s, rotation a chaque manche, rappel toutes les 10 min
+horloge = [0.0]
+r = L.Rotation('classique', L.lire_cartes('carre, diamant, polygone', lambda m: None), 'ordre', 1,
+               {'TEAM_MAX_PLAYERS': '5', 'SIZE_FACTOR': '0'}, {}, _random.Random(4))
+r.votes_modes, r.votes_cartes, r.rappel_s, r.infos, r.accueil = ['forteresse'], ['carre'], 600, True, 'Bienvenue'
+f = L.Filtre(4534, r, horloge=lambda: horloge[0])
+f.ligne('[L] PLAYER_ENTERED essai 127.0.0.1 essai')
+annonces, aides, rappels, motds = 0, 0, 0, 0
+for i in range(360):                      # 1 heure de manches de 10 s
+    horloge[0] = i * 10.0
+    f.a_envoyer = []
+    f.ligne('[L] WAIT_FOR_EXTERNAL_SCRIPT')
+    f.ligne('[L] NEW_ROUND 2026-10-11 10:00:00 UTC')
+    for c in f.a_envoyer:
+        if c.startswith('CONSOLE_MESSAGE') and 'Nouvelle carte' in c:
+            annonces += 1
+            aides += '/vote include' in c
+        elif c.startswith('CONSOLE_MESSAGE') and 'Rappel' in c:
+            rappels += 1
+        elif c.startswith('MESSAGE_OF_DAY '):
+            motds += 1
+        try:
+            c.encode('latin-1')
+        except UnicodeEncodeError:
+            soucis.append('commande hors Latin-1 : %r' % c)
+if annonces != 360 or motds != 360 or aides != 30 or rappels != 0:
+    soucis.append('anti-spam, une carte par manche de 10 s : %d annonces, %d avec l\'aide (30 attendues), '
+                  '%d rappels (0 attendu)' % (annonces, aides, rappels))
+# sans rotation (carte fixe) : un seul rappel toutes les 10 min, et aucun sans joueur
+r.rotation = 'aucune'
+r.dernier_aide = None
+rappels = []
+for i in range(360):
+    horloge[0] = 10000 + i * 10.0
+    f.a_envoyer = []
+    if i == 180:
+        f.ligne('[L] PLAYER_LEFT essai 127.0.0.1')
+    f.ligne('[L] WAIT_FOR_EXTERNAL_SCRIPT')
+    f.ligne('[L] NEW_ROUND 2026-10-11 10:00:00 UTC')
+    rappels += [horloge[0] for c in f.a_envoyer if 'Rappel' in c]
+if rappels != [10600.0, 11200.0]:
+    soucis.append('rappel periodique : %r (attendu toutes les 10 min, rien sans joueur)' % rappels)
+r.rappel_s = 0
+r.dernier_aide = None
+f.ligne('[L] PLAYER_ENTERED essai 127.0.0.1 essai')
+for i in range(200):
+    horloge[0] = 20000 + i * 10.0
+    f.a_envoyer = []
+    f.ligne('[L] WAIT_FOR_EXTERNAL_SCRIPT')
+    f.ligne('[L] NEW_ROUND 2026-10-11 10:00:00 UTC')
+    if any('Rappel' in c for c in f.a_envoyer):
+        soucis.append('rappel envoye alors qu\'il est coupe (0)')
+        break
+# echo reel du 11/10/2026 : le texte s'etale sur plusieurs lignes sans « [0] »
+ECHO_MOTD = ['[0] MESSAGE_OF_DAY a change Serveur francophone heberge gratuitement par TeamKit.fr',
+             'Discord : discord.gg/EuAjGMYPHY', '', 'Mode : Équipes   ·   Carte : Carré',
+             "Pour approuver le vote d'un autre joueur : Échap > Vote > flèche droite > Échap. en Serveur francophone",
+             'Liste des noms : /help votes']
+for ligne in ECHO_MOTD:
+    if f.ligne(ligne):
+        soucis.append('echo de MESSAGE_OF_DAY non filtre : %r' % ligne)
+for ligne in ('[0] Suppression des objets...', 'Envoyes:   9034 octets dans 47 paquets (44.4856 octets/s)'):
+    if f.ligne(ligne) != [ligne]:
+        soucis.append('ligne normale retiree apres un echo : %r' % ligne)
+print('ok   accueil et rappels         message d\'accueil, annonce, rappel, anti-spam sur 1 h de manches de 10 s')
 
 # ── 7. fichiers telecharges a l'Update ───────────────────────────────────────
 depot = data['manifest.json']['url'].replace('https://github.com/', '')

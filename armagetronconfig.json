@@ -108,7 +108,7 @@
         "DisplayName": "Message d'accueil",
         "Category": "Armagetron:public",
         "Subcategory": "Accueil des joueurs:flag:2",
-        "Description": "Texte de la fenêtre d'accueil. \\n = retour à la ligne. Accents, virgules, guillemets, # et accolades passent tels quels ; pas d'emoji (retirés au démarrage) ; le tiret long devient -. Vide = pas de fenêtre d'accueil.",
+        "Description": "Texte de la grande fenêtre affichée à chaque joueur qui se connecte. \\n = retour à la ligne. Accents, virgules, guillemets, # et accolades passent tels quels ; pas d'emoji (retirés au démarrage) ; le tiret long devient -. Si « Ajouter le mode, la carte et l'aide aux votes » est coché, ces informations s'affichent sous ce texte. Vide et case décochée = pas de fenêtre.",
         "Keywords": "accueil,bienvenue,motd,message,message_of_day",
         "FieldName": "MESSAGE_OF_DAY",
         "InputType": "text",
@@ -394,6 +394,54 @@
         "ParamFieldName": "TK_VOTES_MODES",
         "IncludeInCommandLine": false,
         "DefaultValue": "classique, equipes, forteresse, zone, sumo",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Ajouter le mode, la carte et l'aide aux votes",
+        "Category": "Armagetron:public",
+        "Subcategory": "Accueil des joueurs:flag:2",
+        "Description": "Sous le message d'accueil, la fenêtre de connexion montre le mode et la carte en cours (mis à jour à chaque changement) et, si les votes de modes et de cartes sont ouverts, comment voter : /vote include <mode ou carte>, /help votes, Échap > Vote pour approuver. Sans effet si la rotation et les votes de modes et de cartes sont coupés.",
+        "Keywords": "accueil,motd,mode,carte,aide,votes",
+        "FieldName": "TK_ACCUEIL_INFOS",
+        "InputType": "checkbox",
+        "ParamFieldName": "TK_ACCUEIL_INFOS",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "1",
+        "EnumValues": {
+            "False": "0",
+            "True": "1"
+        }
+    },
+    {
+        "DisplayName": "Durée maximale du message d'accueil",
+        "Category": "Armagetron:public",
+        "Subcategory": "Accueil des joueurs:flag:2",
+        "Description": "La fenêtre se ferme après ce temps, ou dès que le joueur appuie sur une touche (MESSAGE_OF_DAY_TIMEOUT). Défaut du jeu : 60 s.",
+        "Keywords": "duree,accueil,motd,message_of_day_timeout",
+        "FieldName": "TK_ACCUEIL_DUREE",
+        "InputType": "number",
+        "MinValue": "5",
+        "MaxValue": "600",
+        "ParamFieldName": "TK_ACCUEIL_DUREE",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "60",
+        "Suffix": "secondes",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Rappel des commandes de vote toutes les",
+        "Category": "Armagetron:public",
+        "Subcategory": "Votes des joueurs:how_to_vote:6",
+        "Description": "Une ligne discrète dans le chat rappelle /vote include et /help votes, entre deux manches, seulement si des joueurs sont connectés et si l'aide n'a pas déjà été donnée pendant ce temps (une annonce de nouvelle carte avec l'aide compte). 0 = pas de rappel. Seulement quand les votes de modes et de cartes sont ouverts.",
+        "Keywords": "rappel,votes,aide,chat",
+        "FieldName": "TK_RAPPEL_MINUTES",
+        "InputType": "number",
+        "MinValue": "0",
+        "MaxValue": "240",
+        "ParamFieldName": "TK_RAPPEL_MINUTES",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "10",
+        "Suffix": "minutes",
         "EnumValues": {}
     }
 ]
