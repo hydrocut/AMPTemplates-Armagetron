@@ -120,7 +120,7 @@
     {
         "DisplayName": "Manches par match",
         "Category": "Armagetron:public",
-        "Subcategory": "Partie:sports_esports:3",
+        "Subcategory": "Mode de jeu:sports_esports:3",
         "Description": "Un match s'arrête après ce nombre de manches (ou à 100 points, ou après 30 minutes : réglages LIMIT_SCORE et LIMIT_TIME, dans perso.cfg). Puis les scores repartent à zéro. Défaut du jeu : 10.",
         "Keywords": "manches,rounds,match,limit_rounds",
         "FieldName": "LIMIT_ROUNDS",
@@ -136,8 +136,8 @@
     {
         "DisplayName": "Joueurs par équipe",
         "Category": "Armagetron:public",
-        "Subcategory": "Partie:sports_esports:3",
-        "Description": "Taille maximale d'une équipe. 1 = chacun pour soi. Défaut du jeu : 5 (les joueurs sont répartis automatiquement).",
+        "Subcategory": "Mode de jeu:sports_esports:3",
+        "Description": "Taille maximale d'une équipe dans les modes Équipes et Forteresse (les modes Classique, Zone de mort et Sumo jouent toujours en chacun pour soi). Défaut du jeu : 5, les joueurs sont répartis automatiquement.",
         "Keywords": "equipe,team,team_max_players,solo",
         "FieldName": "TEAM_MAX_PLAYERS",
         "InputType": "number",
@@ -150,10 +150,10 @@
         "EnumValues": {}
     },
     {
-        "DisplayName": "Bots : compléter jusqu'à",
+        "DisplayName": "Bots : compléter les parties jusqu'à",
         "Category": "Armagetron:public",
-        "Subcategory": "Partie:sports_esports:3",
-        "Description": "Quand au moins 2 joueurs sont connectés, des bots complètent la partie jusqu'à ce nombre de motos. 0 = pas de bots (défaut du jeu). Un joueur seul sur le serveur joue toujours contre 3 bots (réglages SP_* du jeu).",
+        "Subcategory": "Bots:smart_toy:5",
+        "Description": "Quand au moins 2 joueurs sont connectés, des bots complètent la partie jusqu'à ce nombre de motos (MIN_PLAYERS). 0 = pas de bots en plus. Un joueur seul affronte au moins 3 bots si les bots sont activés. Ignoré si les bots sont désactivés.",
         "Keywords": "bots,ia,ai,min_players,ordinateur",
         "FieldName": "MIN_PLAYERS",
         "InputType": "number",
@@ -168,7 +168,7 @@
     {
         "DisplayName": "Vitesse des motos",
         "Category": "Armagetron:public",
-        "Subcategory": "Partie:sports_esports:3",
+        "Subcategory": "Mode de jeu:sports_esports:3",
         "Description": "Réglage SPEED_FACTOR du jeu : +2 double la vitesse, -2 la divise par deux.",
         "Keywords": "vitesse,speed,speed_factor,rapide",
         "FieldName": "SPEED_FACTOR",
@@ -187,8 +187,8 @@
     {
         "DisplayName": "Taille de l'arène",
         "Category": "Armagetron:public",
-        "Subcategory": "Partie:sports_esports:3",
-        "Description": "Réglage SIZE_FACTOR du jeu : +2 double la taille de l'arène, -2 la divise par deux.",
+        "Subcategory": "Mode de jeu:sports_esports:3",
+        "Description": "Réglage SIZE_FACTOR du jeu : +2 double la taille de l'arène, -2 la divise par deux. Le mode Sumo impose sa propre taille (+1).",
         "Keywords": "arene,taille,size,size_factor,carte",
         "FieldName": "SIZE_FACTOR",
         "InputType": "enum",
@@ -202,5 +202,198 @@
             "1": "Plus grande",
             "2": "Deux fois plus grande"
         }
+    },
+    {
+        "DisplayName": "Mode de jeu",
+        "Category": "Armagetron:public",
+        "Subcategory": "Mode de jeu:sports_esports:3",
+        "Description": "Règles appliquées au démarrage. Classique : chacun pour soi, le dernier en vie gagne. Équipes : les règles du jeu sans rien changer (équipes formées automatiquement). Forteresse : chaque équipe défend sa zone et attaque celle des autres (cartes à zones seulement). Zone de mort : chacun pour soi, et la zone qui apparaît au bout de 45 s tue au lieu de faire gagner. Sumo : chaque joueur garde sa zone, sortir de l'arène rétrécissante élimine. Réglages tirés des exemples livrés avec le serveur (config/examples). Les joueurs peuvent en changer par un vote.",
+        "Keywords": "mode,jeu,forteresse,fortress,sumo,zone,equipes,classique",
+        "FieldName": "TK_MODE",
+        "InputType": "enum",
+        "ParamFieldName": "TK_MODE",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "equipes",
+        "EnumValues": {
+            "classique": "Classique (chacun pour soi)",
+            "equipes": "Équipes (règles du jeu)",
+            "forteresse": "Forteresse",
+            "zone": "Zone de mort",
+            "sumo": "Sumo"
+        }
+    },
+    {
+        "DisplayName": "Cartes en rotation",
+        "Category": "Armagetron:public",
+        "Subcategory": "Cartes et rotation:map:4",
+        "Description": "Noms séparés par des virgules. Toutes ces cartes fonctionnent avec le jeu actuel (essai du 11/10/2026). Cartes sans zone (modes Classique, Équipes, Zone de mort) : carre, diamant, polygone, inaktek, repeat, hexatron, croix, tripath, dents. Forteresse : fort2, fort4, fortcarre, egalite. Sumo : sumo4, fosse. Chaque mode ne prend que les cartes de son type. Une autre carte du dépôt officiel resource.armagetronad.net : son chemin, ex. Auteur/dossier/carte-1.0.aamap.xml (préfixe forteresse: ou sumo: si elle a des zones). Les joueurs la téléchargent tout seuls. Ces noms servent aussi aux votes.",
+        "Keywords": "cartes,carte,map,map_file,rotation,liste",
+        "FieldName": "TK_CARTES",
+        "InputType": "text",
+        "ParamFieldName": "TK_CARTES",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "carre, diamant, polygone, inaktek, repeat, hexatron, croix, tripath, dents, fort2, fort4, fortcarre, egalite, sumo4, fosse",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Rotation des cartes",
+        "Category": "Armagetron:public",
+        "Subcategory": "Cartes et rotation:map:4",
+        "Description": "Comment la carte change entre deux manches : au hasard parmi les cartes du mode, dans l'ordre de la liste, ou jamais (première carte de la liste ; seul un vote la change). La nouvelle carte est prise à la manche suivante.",
+        "Keywords": "rotation,ordre,hasard,aleatoire",
+        "FieldName": "TK_ROTATION",
+        "InputType": "enum",
+        "ParamFieldName": "TK_ROTATION",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "aleatoire",
+        "EnumValues": {
+            "aleatoire": "Au hasard",
+            "ordre": "Dans l'ordre de la liste",
+            "aucune": "Pas de rotation"
+        }
+    },
+    {
+        "DisplayName": "Changer de carte toutes les",
+        "Category": "Armagetron:public",
+        "Subcategory": "Cartes et rotation:map:4",
+        "Description": "Nombre de manches jouées sur une carte avant de passer à la suivante. 1 = à chaque manche.",
+        "Keywords": "manches,rounds,rotation",
+        "FieldName": "TK_ROTATION_MANCHES",
+        "InputType": "number",
+        "MinValue": "1",
+        "MaxValue": "100",
+        "ParamFieldName": "TK_ROTATION_MANCHES",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "1",
+        "Suffix": "manches",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Bots activés",
+        "Category": "Armagetron:public",
+        "Subcategory": "Bots:smart_toy:5",
+        "Description": "Décoché : aucun bot, un joueur seul attend d'autres joueurs. Coché : un joueur seul affronte au moins 3 bots, et les réglages ci-dessous s'appliquent. Les bots n'apparaissent jamais dans la liste des joueurs d'AMP.",
+        "Keywords": "bots,ia,ai,ordinateur",
+        "FieldName": "TK_BOTS",
+        "InputType": "checkbox",
+        "ParamFieldName": "TK_BOTS",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "1",
+        "EnumValues": {
+            "False": "0",
+            "True": "1"
+        }
+    },
+    {
+        "DisplayName": "Bots toujours présents",
+        "Category": "Armagetron:public",
+        "Subcategory": "Bots:smart_toy:5",
+        "Description": "Nombre minimum de bots dans chaque manche, même quand il y a assez de joueurs (NUM_AIS). 0 = défaut du jeu.",
+        "Keywords": "bots,num_ais,ia",
+        "FieldName": "TK_BOTS_PERMANENTS",
+        "InputType": "number",
+        "MinValue": "0",
+        "MaxValue": "16",
+        "ParamFieldName": "TK_BOTS_PERMANENTS",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "0",
+        "Suffix": "bots",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Niveau des bots",
+        "Category": "Armagetron:public",
+        "Subcategory": "Bots:smart_toy:5",
+        "Description": "Intelligence des bots (AI_IQ, 0 à 100). Défaut du jeu : 50.",
+        "Keywords": "niveau,difficulte,ai_iq,bots",
+        "FieldName": "TK_BOTS_NIVEAU",
+        "InputType": "enum",
+        "ParamFieldName": "TK_BOTS_NIVEAU",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "50",
+        "EnumValues": {
+            "20": "Facile",
+            "50": "Moyen (défaut du jeu)",
+            "75": "Difficile",
+            "100": "Expert"
+        }
+    },
+    {
+        "DisplayName": "Bots qui s'adaptent aux joueurs",
+        "Category": "Armagetron:public",
+        "Subcategory": "Bots:smart_toy:5",
+        "Description": "Coché : après chaque manche, le jeu ajoute ou retire des bots et règle leur niveau selon les résultats des joueurs (AUTO_AIS et AUTO_IQ).",
+        "Keywords": "auto_ais,auto_iq,adaptatif,bots",
+        "FieldName": "TK_BOTS_ADAPTATIFS",
+        "InputType": "checkbox",
+        "ParamFieldName": "TK_BOTS_ADAPTATIFS",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "0",
+        "EnumValues": {
+            "False": "0",
+            "True": "1"
+        }
+    },
+    {
+        "DisplayName": "Votes des joueurs",
+        "Category": "Armagetron:public",
+        "Subcategory": "Votes des joueurs:how_to_vote:6",
+        "Description": "Modes et cartes : en plus des votes d'exclusion du jeu, un joueur tape dans le chat /vote include NOM (un mode ou une carte de la liste, en minuscules), les autres votent dans le menu (Échap > Vote) ; /help votes affiche la liste en jeu. Exclusion seulement : les votes d'origine du jeu (exclure, suspendre). Aucun : pas de vote.",
+        "Keywords": "votes,vote,include,allow_voting,sondage",
+        "FieldName": "TK_VOTES",
+        "InputType": "enum",
+        "ParamFieldName": "TK_VOTES",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "modes_cartes",
+        "EnumValues": {
+            "modes_cartes": "Modes et cartes (+ exclusion)",
+            "exclusion": "Exclusion seulement",
+            "aucun": "Aucun vote"
+        }
+    },
+    {
+        "DisplayName": "Joueurs en ligne pour voter",
+        "Category": "Armagetron:public",
+        "Subcategory": "Votes des joueurs:how_to_vote:6",
+        "Description": "Un vote est refusé s'il y a moins de joueurs connectés (MIN_VOTERS = ce nombre moins 1). Il passe quand plus de la moitié des joueurs ont voté pour ; les absents comptent de moins en moins après 1 minute. Défaut du jeu : 4.",
+        "Keywords": "votants,min_voters,joueurs",
+        "FieldName": "TK_VOTES_JOUEURS",
+        "InputType": "number",
+        "MinValue": "1",
+        "MaxValue": "32",
+        "ParamFieldName": "TK_VOTES_JOUEURS",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "2",
+        "Suffix": "joueurs",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Temps de jeu avant de proposer un vote",
+        "Category": "Armagetron:public",
+        "Subcategory": "Votes des joueurs:how_to_vote:6",
+        "Description": "Un joueur doit être connecté depuis ce temps, sous le même pseudo, pour proposer un vote (VOTING_MATURITY, anti-abus). Défaut du jeu : 300 s.",
+        "Keywords": "maturite,voting_maturity,anciennete",
+        "FieldName": "TK_VOTES_ANCIENNETE",
+        "InputType": "number",
+        "MinValue": "0",
+        "MaxValue": "3600",
+        "ParamFieldName": "TK_VOTES_ANCIENNETE",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "60",
+        "Suffix": "secondes",
+        "EnumValues": {}
+    },
+    {
+        "DisplayName": "Modes proposés au vote",
+        "Category": "Armagetron:public",
+        "Subcategory": "Votes des joueurs:how_to_vote:6",
+        "Description": "Modes que les joueurs peuvent choisir par un vote, séparés par des virgules : classique, equipes, forteresse, zone, sumo. « aucun » = seulement les cartes.",
+        "Keywords": "modes,vote,include",
+        "FieldName": "TK_VOTES_MODES",
+        "InputType": "text",
+        "ParamFieldName": "TK_VOTES_MODES",
+        "IncludeInCommandLine": false,
+        "DefaultValue": "classique, equipes, forteresse, zone, sumo",
+        "EnumValues": {}
     }
 ]

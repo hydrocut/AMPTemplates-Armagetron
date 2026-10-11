@@ -23,7 +23,12 @@ Controle du template avant de le pousser (meme role que ceux de Wesnoth, Freeciv
    et les regex de console d'AMP sur ce qu'il produit ;
 7. les fichiers telecharges a l'Update existent dans scripts/, a l'URL du depot du
    manifest ; l'AppImage vient de l'URL stable officielle ;
-8. fins de ligne LF, aucun {{ dans le lanceur, compilation Python.
+8. fins de ligne LF, aucun {{ dans le lanceur, compilation Python ;
+6 bis. cartes, modes, bots, votes (11/10/2026) : reglages TK_ identiques dans AMP, le
+   modele et le lanceur ; un ancien formulaire (TK_ laisses tels quels ou vides) donne
+   exactement le fonctionnement d'avant ; rotation dans l'ordre toutes les N manches,
+   votes de mode et de carte, carte illisible, perso.cfg et bots renvoyes, remise a zero
+   des reglages que les cartes fixent ; detection du vote sur de vraies lignes du serveur.
 """
 import importlib.util
 import io
@@ -382,6 +387,152 @@ t, retires = L.vers_latin1('SAY Bonjour \u00e0 tous \u2014 c\u2019est TeamKit \U
 if t != 'SAY Bonjour \u00e0 tous - c\'est TeamKit ' or retires != ['\U0001F600']:
     soucis.append('vers_latin1 : %r %r' % (t, retires))
 print('ok   console                    %d lignes reelles, %d pieges' % (len(SEQUENCE), len(PIEGES)))
+
+# ── 6 bis. cartes, modes, bots, votes (11/10/2026) ──────────────────────────
+import random as _random
+
+nouvelles = set(L.NOUVELLES)
+dans_json = {c['ParamFieldName'] for c in config if c['ParamFieldName'].startswith('TK_')}
+if nouvelles != dans_json:
+    soucis.append('reglages TK_ : lanceur et AMP differents : %s' % sorted(nouvelles ^ dans_json))
+if not nouvelles <= set(dans_modele):
+    soucis.append('reglages TK_ absents du modele : %s' % sorted(nouvelles - set(dans_modele)))
+if set(L.MODES) & set(L.CARTES):
+    soucis.append('un mode et une carte portent le meme nom : %s' % (set(L.MODES) & set(L.CARTES)))
+for nom, (chemin, typ, equipes, libelle) in L.CARTES.items():
+    if not L.NOM_VOTE.fullmatch(nom) or not L.CHEMIN_CARTE.fullmatch(chemin) or typ not in L.SECOURS:
+        soucis.append('carte %s mal decrite' % nom)
+    if typ == 'forteresse' and equipes not in (2, 4):
+        soucis.append('carte %s : nombre d\'equipes inattendu' % nom)
+    try:
+        libelle.encode('latin-1')
+    except UnicodeEncodeError:
+        soucis.append('libelle hors Latin-1 : %s' % libelle)
+for m, (libelle, typ, regles) in L.MODES.items():
+    if typ not in L.SECOURS or not set(regles) <= set(L.BASE):
+        soucis.append('mode %s : type ou reglage inconnu (%s)' % (m, set(regles) - set(L.BASE)))
+if set(params['TK_MODE']['EnumValues']) != set(L.MODES):
+    soucis.append('modes d\'AMP et du lanceur differents')
+if set(params['TK_ROTATION']['EnumValues']) != set(L.ROTATIONS) or set(params['TK_VOTES']['EnumValues']) != set(L.VOTES):
+    soucis.append('listes rotation / votes d\'AMP et du lanceur differentes')
+for nom in re.split(r'[,\s]+', params['TK_CARTES']['DefaultValue'].strip()):
+    if nom not in L.CARTES:
+        soucis.append('carte par defaut inconnue : %s' % nom)
+for nom in L.CARTES:
+    if nom not in params['TK_CARTES']['Description']:
+        soucis.append('carte %s absente de la description d\'AMP' % nom)
+
+# formulaire d'avant le 11/10 : AMP laisse {{TK_...}} ou n'ecrit rien -> fonctionnement d'avant
+for rendu in ('litteral', 'vide'):
+    vals = {p: d for p, d in defauts.items() if not p.startswith('TK_')}
+    t = rendre(vals)
+    if rendu == 'vide':
+        t = re.sub(r'\{\{TK_[A-Z_]+\}\}', '', t)
+    avis = []
+    try:
+        contenu, rot, fichiers = L.preparer(t, '', 4534, 16, avis.append)
+    except L.Refus as e:
+        soucis.append('ancien formulaire (%s) refuse : %s' % (rendu, e))
+        continue
+    lu = lire_comme_le_jeu(contenu.encode('latin-1'))
+    attendu = {'WAIT_FOR_EXTERNAL_SCRIPT': '0', 'MAP_FILE': 'Anonymous/polygon/regular/square-1.0.1.aamap.xml',
+               'ALLOW_VOTING': '1', 'MIN_VOTERS': '3', 'VOTING_MATURITY': '300', 'SP_MIN_PLAYERS': '4',
+               'NUM_AIS': '0', 'AI_IQ': '50', 'AUTO_AIS': '0', 'TEAM_MAX_PLAYERS': defauts['TEAM_MAX_PLAYERS']}
+    for cle, v in L.BASE.items():
+        if not v.startswith('@'):
+            attendu[cle] = v
+    ecarts = {k: (lu.get(k), v) for k, v in attendu.items() if lu.get(k) != v}
+    if ecarts or rot is not None or fichiers or 'ACCESS_LEVEL_VOTE_INCLUDE' in lu:
+        soucis.append('ancien formulaire (%s) : le fonctionnement change : %s' % (rendu, ecarts))
+    if not any('absents du formulaire' in a for a in avis):
+        soucis.append('ancien formulaire (%s) : pas de message dans la console' % rendu)
+
+# nouveau formulaire, valeurs par defaut
+contenu, rot, fichiers = L.preparer(rendre(defauts), 'WALLS_LENGTH 300\nAI_IQ 90\n', 4534, 16,
+                                    lambda m: soucis.append('avertissement inattendu : ' + m),
+                                    _random.Random(3))
+lu = lire_comme_le_jeu(contenu.encode('latin-1'))
+if rot is None or lu.get('WAIT_FOR_EXTERNAL_SCRIPT') != '1' or lu.get('ACCESS_LEVEL_VOTE_INCLUDE') != '20':
+    soucis.append('defauts : rotation ou votes inactifs')
+if lu.get('MIN_VOTERS') != str(int(defauts['TK_VOTES_JOUEURS']) - 1) or lu.get('WALLS_LENGTH') != '300':
+    soucis.append('defauts : MIN_VOTERS ou perso.cfg mal appliques')
+attendus = set()
+for nom in list(L.MODES) + re.split(r'[,\s]+', defauts['TK_CARTES'].strip()):
+    attendus |= {nom, nom + '.cfg'}
+if set(fichiers) != attendus:
+    soucis.append('fichiers de vote inattendus : %s' % sorted(set(fichiers) ^ attendus))
+aide = [l for l in contenu.splitlines() if l.startswith('ADD_HELP_TOPIC votes ')]
+if not aide or '/vote include' not in aide[0] or 'fortcarre' not in aide[0]:
+    soucis.append('aide /help votes absente ou incomplete')
+
+# rotation : ordre, toutes les N manches, votes, carte illisible, perso.cfg et bots renvoyes
+cartes = L.lire_cartes('carre, diamant, fort2, fort4, sumo4, Auteur/x/ma_carte-1.0.aamap.xml, '
+                       'forteresse:Auteur/y/fort-2.aamap.xml, ../x.aamap.xml, inconnue', lambda m: None)
+noms = [c[0] for c in cartes]
+if noms != ['carre', 'diamant', 'fort2', 'fort4', 'sumo4', 'ma_carte', 'fort'] or cartes[6][2:4] != ('forteresse', 2):
+    soucis.append('lecture de la liste de cartes : %s' % noms)
+r = L.Rotation('classique', cartes, 'ordre', 2, {'TEAM_MAX_PLAYERS': '5', 'SIZE_FACTOR': '0'},
+               {'WALLS_LENGTH': '300'}, _random.Random(1), ['NUM_AIS 2', 'SP_MIN_PLAYERS 4'])
+suite = []
+for _ in range(6):
+    cmds = r.fin_de_manche()
+    suite.append(r.carte[0])
+    if cmds[-1] != 'WAIT_FOR_EXTERNAL_SCRIPT 0':
+        soucis.append('fin de manche sans WAIT_FOR_EXTERNAL_SCRIPT 0')
+if suite != ['carre', 'diamant', 'diamant', 'ma_carte', 'ma_carte', 'carre']:
+    soucis.append('rotation dans l\'ordre toutes les 2 manches : %s' % suite)
+r.vote('forteresse')
+cmds = dict(c.split(' ', 1) for c in r.fin_de_manche() if not c.startswith('CONSOLE'))
+if r.mode != 'forteresse' or r.carte[0] != 'fort2' or cmds.get('TEAMS_MAX') != '2' or cmds.get('TEAM_MAX_PLAYERS') != '5':
+    soucis.append('vote de mode forteresse : %s %s %s' % (r.mode, r.carte[0], cmds.get('TEAMS_MAX')))
+if cmds.get('WALLS_LENGTH') != '300' or cmds.get('NUM_AIS') != '2' or cmds.get('SP_TEAMS_MIN') != '1':
+    soucis.append('perso.cfg, bots ou remise a zero des reglages de carte non renvoyes : %s' % cmds)
+r.vote('sumo4')
+r.fin_de_manche()
+if (r.mode, r.carte[0]) != ('sumo', 'sumo4'):
+    soucis.append('vote de carte sumo : %s %s' % (r.mode, r.carte[0]))
+r.vote('carre')
+r.fin_de_manche()
+if (r.mode, r.carte[0]) != ('classique', 'carre'):
+    soucis.append('vote de carte classique depuis le sumo : %s %s' % (r.mode, r.carte[0]))
+r.vote('diamant')
+r.fin_de_manche()
+r.carte_ratee()
+if r.carte[0] != 'carre' or 'Anonymous/polygon/regular/diamond-1.0.2.aamap.xml' not in r.ratees:
+    soucis.append('carte illisible : retour a la precedente rate')
+if r.vote('inconnue') is not None:
+    soucis.append('vote d\'un nom inconnu accepte')
+
+# filtre : votes, echo des reglages, attente entre manches
+f = L.Filtre(4534, L.Rotation('classique', cartes, 'aleatoire', 1, {'TEAM_MAX_PLAYERS': '5', 'SIZE_FACTOR': '0'}, {}, _random.Random(2)))
+VOTES_REELS = [
+    ('[1] Including file vote/forteresse. Only users of access level Moderator or higher will receive the output.', 'forteresse'),
+    ('[2] Including file vote/hexatron.cfg. Only users of access level Moderator or higher will receive the output.', None),
+    ('[2] Including file vote/fort4.cfg. Only users of access level Moderator or higher will receive the output.', 'fort4'),
+    ('[1] Player 1: Including file vote/sumo.', None),
+    ('[1] Sondage "Include forteresse" accepte.', None),
+    ('[1] Include file vote/../perso.cfg not found or not readable.', None),
+]
+for ligne, attendu in VOTES_REELS:
+    f.rotation.vote_mode = f.rotation.vote_carte = None
+    sortie = f.ligne(ligne)
+    vu = f.rotation.vote_mode or (f.rotation.vote_carte or (None,))[0]
+    if vu != attendu or sortie[0] != ligne:
+        soucis.append('detection de vote : %r -> %r' % (ligne, vu))
+for ligne in ('[0] MAP_FILE a change A en B.', '[0] Setting MAP_FILE (Group: Breaking) deviates from its default value; clients older than 0.2.8_beta3 will not be allowed in.',
+              '[0] WAIT_FOR_EXTERNAL_SCRIPT a change 1 en 0.', '[0] SP_TEAMS_MIN a change 1 en 2.', '[0] FORTRESS_MAX_PER_TEAM a change 0 en 2.'):
+    if f.ligne(ligne):
+        soucis.append('echo de reglage non filtre : %r' % ligne)
+f.ligne('[L] WAIT_FOR_EXTERNAL_SCRIPT')
+if not f.a_envoyer or f.a_envoyer[-1] != 'WAIT_FOR_EXTERNAL_SCRIPT 0':
+    soucis.append('evenement WAIT_FOR_EXTERNAL_SCRIPT sans reponse')
+f.a_envoyer = []
+f.ligne('[L] NEW_ROUND 2026-10-11 09:56:50 UTC')
+if f.a_envoyer != ['WAIT_FOR_EXTERNAL_SCRIPT 1']:
+    soucis.append('NEW_ROUND doit remettre WAIT_FOR_EXTERNAL_SCRIPT 1')
+if not f.ligne('[0] The map TeamKit/essai/inexistante-1.0.aamap.xml could not be loaded or parsed; please check your configuration and the log.')[1:]:
+    soucis.append('carte illisible non signalee')
+print('ok   cartes, modes, votes       %d cartes, %d modes, ancien formulaire inchange, rotation simulee' % (len(L.CARTES), len(L.MODES)))
 
 # ── 7. fichiers telecharges a l'Update ───────────────────────────────────────
 depot = data['manifest.json']['url'].replace('https://github.com/', '')
